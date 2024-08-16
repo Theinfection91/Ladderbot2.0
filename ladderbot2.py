@@ -7,10 +7,13 @@ import time
 
 class Ladderbot(commands.Cog):
     """
-    LADDERBOT 2.0
+    --LADDERBOT 2.0--
+    Created by Ixnay
+    
 
     This is a refactored class from all the functions
     that made up Ladderbot 1.x
+
     """
 
     def __init__(self, bot):
@@ -96,6 +99,12 @@ class Ladderbot(commands.Cog):
     
     @commands.Cog.listener()
     async def on_ready(self):
+        """
+        A listener method used to keep track of
+        if the ladder is running and also the locations
+        of the seperate standings and
+        challenges channels.
+        """
         print(f"Logged in as {self.bot.user}")
         if self.ladder_running:
             print("The ladder is currently running.")
@@ -107,11 +116,22 @@ class Ladderbot(commands.Cog):
     
     @commands.command()
     async def register_team(self, ctx, team_name, *members: discord.Member):
+        """
+        Method that all level of users can call on
+        to create a new team with specific members
+
+        If no members are given, a team is created with
+        only the user who called on it as the sole
+        person on the team
+        """
         if team_name in self.teams:
             await ctx.send(f"Team {team_name} already exists, please choose a different team name.")
             return
         
+        # Grabs the ID of every member used as a parameter for this method and stores it
         team_members = [member.id for member in (members or [ctx.author])]
+
+        # Each newly created team will start in the last most place in standings
         add_team_rank = len(self.teams) + 1
 
         self.teams[team_name] = {
