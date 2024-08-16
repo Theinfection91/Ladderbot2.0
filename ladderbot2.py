@@ -37,10 +37,9 @@ class Ladderbot(commands.Cog):
         self.STATE_FILE = 'state.json'
 
         # Load data from .json files
-        
-
-
-        #
+        self.load_teams()
+        self.load_matches()
+        self.load_state()
     
     def load_teams(self):
         """
