@@ -104,3 +104,23 @@ class Ladderbot(commands.Cog):
                 if channel:
                     await self.update_standings_message(channel)
                     self.periodic_update_standings.start()
+    
+    @commands.command()
+    async def register_team(self, ctx, team_name, *members: discord.Member):
+        if team_name in self.teams:
+            await ctx.send(f"Team {team_name} already exists, please choose a different team name.")
+            return
+        
+        team_members = [member.id for member in (members or [ctx.author])]
+        add_team_rank = len(self.teams) + 1
+
+        self.teams[team_name] = {
+            'members': team_members,
+            'rank': add_team_rank,
+            'wins': 0,
+            'losses': 0
+        }
+
+        self.save_teams()
+        member_names = [ctx.guild.get_member(member_id).display_name for member_id in team_members]
+        await ctx.send(f"Team {team_name} has been registered with members {', '.join(member_names)}.")
