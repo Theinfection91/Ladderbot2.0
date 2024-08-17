@@ -15,6 +15,12 @@ class Ladderbot(commands.Cog):
     that made up Ladderbot 1.x
     """
     def __init__(self, bot):
+        """
+        Initializes a new instance of the Ladderbot class.
+
+        Initializes the bot, teams, matches, channels, and file paths.
+        Loads data from teams.json, matches.json, and state.json files.
+        """
         self.bot = bot
 
         # Variables to hold the data from teams.json and matches.json
@@ -128,11 +134,11 @@ class Ladderbot(commands.Cog):
     async def register_team(self, ctx, team_name, *members: discord.Member):
         """
         Method that all level of users can call on
-        to create a new team with specific members
+        to create a new team with specific members.
 
         If no members are given, a team is created with
         only the user who called on it as the sole
-        person on the team
+        person on the team.
         """
         if team_name in self.teams:
             await ctx.send(f"Team {team_name} already exists, please choose a different team name.")
@@ -160,7 +166,7 @@ class Ladderbot(commands.Cog):
     async def remove_team(self, ctx, team_name):
         """
         An Admin only method for removing a
-        specified team name
+        specified team name.
         """
         if team_name not in self.teams:
             await ctx.send(f"Team {team_name} does not exist.")
@@ -176,7 +182,7 @@ class Ladderbot(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def start_ladder(self, ctx):
         """
-        Admin only method to start the ladder
+        Admin only method to start the ladder.
         """
         if self.ladder_running:
             await ctx.send("The ladder is already running.")
@@ -191,7 +197,7 @@ class Ladderbot(commands.Cog):
     @commands.command()
     async def challenge(self, ctx, challenger_team, team_name):
         """
-        Normal challenge command that EVERYONE can use
+        Normal challenge command that EVERYONE can use.
 
         Takes the challenger team and the team they want
         to challenge as the arguments. 
@@ -244,7 +250,7 @@ class Ladderbot(commands.Cog):
     async def cancel_challenge(self, ctx, team_name):
         """
         A team that has sent out a challenge in mistake
-        can use this method to cancel it
+        can use this method to cancel it.
         """
         # Check if given team name actually exists in teams.json
         if team_name not in self.teams:
@@ -311,3 +317,97 @@ class Ladderbot(commands.Cog):
         }
         self.save_matches()
         await ctx.send(f"An Admin has manually created this challenge: {challenger_team} has challenged {team_name}!")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def admin_cancel_challenge(self, ctx, team_name):
+        """
+        Admin only method for handling canceling challenges
+        sent out by a given team.
+        """
+        # Check if given team name actually exists in teams.json
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+
+        # Check if the given team name has an active challenge sent out
+        match_id = next((key for key, value in self.matches.items() if value['challenger'] == team_name), None)
+
+        # If no sent challenge is found from team_name, stop method and print message
+        if not match_id:
+            await ctx.send(f"Team {team_name} does not have an active challenge.")
+            return
+        
+        # Cancel the challenge and print confirmation message
+        del self.matches[match_id]
+        self.save_matches()
+        await ctx.send(f"The challenge issued by {team_name} has been successfully canceled by an Admin.")
+    
+    @commands.command()
+    async def report_win(self, ctx, winning_team):
+        """
+        This is the report_win method that everyone
+        will have access to.
+
+        If the winning team is a challenger team then
+        they will either move up one rank or two ranks,
+        depending on how far up they challenged in
+        the ladder.
+
+        If the winning team is a challenged team then
+        no rank changes will occur as they defended
+        their rank.
+        """
+        # Check if the winning team is in matches.json
+        match = next((m for m in self.matches.values() if m['challenger'] == winning_team or m['challenged'] == winning_team), None)
+        if match is None:
+            await ctx.send(f"There is no match involving {winning_team}.")
+            return
+
+        # Ensure the author is part of either the winning or losing team
+        if ctx.author.id not in self.teams[match['challenger']['members']] and ctx.author.id not in self.teams[match['challenged']['memers']]:
+            await ctx.send("You are not part of this match.")
+            return
+        
+        # Determine the loser team
+        loser_team = match['challenged'] if match['challenger'] == winning_team else match['challenger']
+        winner_team = winning_team
+
+        # If the winning team was a challenger then rank changes need to occur
+        if winner_team == match['challenger']:
+            # Challenger wins - update ranks
+            losing_rank = self.teams[loser_team]['rank']
+
+            # Winner team takes the loser's rank on the ladder
+            self.teams[winner_team]['rank'] = losing_rank
+
+            # The loser team moves down on rank
+            self.teams[loser_team]['rank'] += 1
+
+            # Shift teams ranked below the losing team down by one
+            for team_name, team_data in self.teams.items():
+                if team_name != winner_team and team_name != loser_team and team_data['rank'] >= self.teams[loser_team]['rank']:
+                    team_data['rank'] += 1
+            
+            # Normalize ranks for safe measure
+            self.normalize_ranks()
+
+            # Send message confirmation about win and rank changes
+            await ctx.send(f"Team {winning_team} has won the match and taken the rank of Team {loser_team}! Team {loser_team} moves down one in the ranks...")
+        
+        # If winning team is a challenged team
+        else:
+            # Challenger loses - no rank change occurs.
+            await ctx.send(f"Team {loser_team} has lost their match against Team {winning_team}... No rank changes occur.")
+
+        # Update wins and losses for both teams
+        self.teams[winning_team]['wins'] += 1
+        self.teams[loser_team]['losses'] += 1
+
+        # Remove the match from matches.json, then save it and teams.json
+        del self.matches[match['challenger']]
+        self.save_teams()
+        self.save_matches()
+
+        #TODO: Post the newly updated standings
+        #await self.post_standings(ctx)
