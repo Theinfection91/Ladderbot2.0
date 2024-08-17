@@ -655,6 +655,180 @@ class Ladderbot(commands.Cog):
         Admin only callable method for manually
         changing a team's rank to a specified integer
         """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        if rank < 1 or rank > len(self.teams):
+            await ctx.send(f"Rank must be between 1 and {len(self.teams)}.")
+            return
+        
+        old_rank = self.teams[team_name]['rank']
+        if old_rank == rank:
+            await ctx.send(f"Team {team_name} is already at rank {rank}.")
+            return
+        
+        # Create a new dictionary to hold the temporary team data
+        temp_teams = {name: data.copy() for name, data in self.teams.items()}
+
+        if old_rank < rank:
+            # Move teams between old_rank and rank up by one
+            for team, data in temp_teams.items():
+                if data['rank'] is not None and old_rank < data['rank'] <= rank:
+                    data['rank'] -= 1
+        elif old_rank > rank:
+        # Move teams between rank and old_rank down by one
+            for team, data in temp_teams.items():
+                if data['rank'] is not None and rank <= data['rank'] < old_rank:
+                    data['rank'] += 1
+        
+        # Set the new rank for the specified team
+        temp_teams[team_name]['rank'] = rank
+
+        # Fix any potential rank inconsistencies
+        all_teams = sorted(temp_teams.items(), key=lambda x: x[1]['rank'])
+        for new_rank, (name, data) in enumerate(all_teams, start=1):
+            if data['rank'] is not None:
+                temp_teams[name]['rank'] = new_rank
+        
+        # Update the self.teams dictionary
+        self.teams.update(temp_teams)
+
+        # Save the teams.json, post standings, and send confirmation message
+        self.save_teams()
+        await self.post_standings(ctx)
+        await ctx.send(f"Rank of {team_name} has been set to {rank}.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def add_win(self, ctx, team_name):
+        """
+        Admin only method for manually
+        adding a win to a given team
+        """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        self.teams[team_name]['wins'] += 1
+        await ctx.send(f"Team {team_name} has had a win given to them by an Admin. They now have {self.teams[team_name]['wins']} wins.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def subtract_win(self, ctx, team_name):
+        """
+        Admin only method for manually
+        subtracting a win to a given team
+        """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        if self.teams[team_name]['wins'] < 1:
+            await ctx.send(f"Cannot complete command as {team_name} does not have any wins.")
+            return
+        
+        if self.teams[team_name]['wins'] >= 1:
+            self.teams[team_name]['wins'] -= 1
+            await ctx.send(f"Team {team_name} has had a win taken away by an Admin. They now have {self.teams[team_name]['wins']} wins.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def add_loss(self, ctx, team_name):
+        """
+        Admin only method for manually
+        adding a loss to a given team
+        """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        self.teams[team_name]['losses'] += 1
+        await ctx.send(f"Team {team_name} has had a loss given to them by an Admin. They now have {self.teams[team_name]['losses']} losses.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def subtract_loss(self, ctx, team_name):
+        """
+        Admin only method for manually
+        subtracting a loss to a given team
+        """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        if self.teams[team_name]['losses'] < 1:
+            await ctx.send(f"Cannot complete command as {team_name} does not have any losses.")
+            return
+        
+        if self.teams[team_name]['losses'] >= 1:
+            self.teams[team_name]['losses'] -= 1
+            await ctx.send(f"Team {team_name} has had a loss taken away by an Admin. They now have {self.teams[team_name]['losses']} losses.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def end_ladder(self, ctx):
+        if not self.ladder_running:
+            await ctx.send("The ladder is not currently running.")
+            return
+        
+        # Change ladder_running flag and save state.json
+        self.ladder_running = False
+        self.save_state()
+
+        # Sort teams
+        sorted_teams = sorted(self.teams.items(), key=lambda x: (x[1]['rank'] is None, x[1]['rank']))
+
+        # Generate standings
+        standings = self.generate_standings()
+
+        if standings:
+            # Create holders for 1st, 2nd, and 3rd place
+            first_place = sorted_teams[0][0] if len(sorted_teams) > 0 else "No team"
+            second_place = sorted_teams[1][0] if len(sorted_teams) > 1 else "No team"
+            third_place = sorted_teams[2][0] if len(sorted_teams) > 2 else "No team"
+
+            # Store standings and first three places together in announcement
+            announcement = (
+            f"**The ladder tournament has ended!**\n\n"
+            f"**Final Standings:**\n{standings}\n\n"
+            f"**1st Place:** {first_place}\n"
+            f"**2nd Place:** {second_place}\n"
+            f"**3rd Place:** {third_place}"
+            )
+
+            # Send announcement data to channel that end_ladder was called from
+            await ctx.send(announcement)
+
+            # Send data to standings channel if one is chosen
+            if self.standings_channel_id:
+                channel = self.bot.get_channel(self.standings_channel_id)
+                await channel.send(announcement)
+        else:
+            await ctx.send("Standings are not available yet.")
+        
+        # Clear matches and teams and save associated .json files
+        self.matches.clear()
+        self.teams.clear()
+        self.save_matches()
+        self.save_teams()
+
+        # Inform the ladder has ended and all data from teams and matches has been cleared
+        await ctx.send("The ladder has now ended. All teams and matches have been cleared. Thank you for playing!")
+    
+    @commands.command()
+    async def show_help(self, ctx):
+        """
+        Provides a link to the bot documentation
+        that is callable by all users.
+        """
+        help_text = """
+    **For more detailed information, refer to the bot's documentation.**
+    ** https://github.com/Theinfection91/LadderbotDoc/blob/main/Ladder%20Bot%20Documentation.md **
+        """
+
+        # Send the help text to the channel this method was called from
+        await ctx.send(help_text)
 
 # Define bot prefix and intents
 intents = discord.Intents.default()
