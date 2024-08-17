@@ -192,6 +192,7 @@ class Ladderbot(commands.Cog):
         self.normalize_ranks()
         self.save_teams()
         self.save_state()
+        await self.post_standings(ctx)
         await ctx.send("The ladder has been started!")
     
     @commands.command()
@@ -409,5 +410,127 @@ class Ladderbot(commands.Cog):
         self.save_teams()
         self.save_matches()
 
-        #TODO: Post the newly updated standings
-        #await self.post_standings(ctx)
+        #Post the newly updated standings
+        await self.post_standings(ctx)
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def admin_report_win(self, ctx, winning_team):
+        """
+        This is the report_win method that only
+        Admins will have access to.
+
+        This method works the exact same as the
+        report_win method, but is only accessible
+        by an Admin and does not require the author
+        to be part of the match.
+        """
+        # Check if the winning team is in matches.json
+        match = next((m for m in self.matches.values() if m['challenger'] == winning_team or m['challenged'] == winning_team), None)
+        if match is None:
+            await ctx.send(f"There is no match involving {winning_team}.")
+            return
+        
+        # Determine the loser team
+        loser_team = match['challenged'] if match['challenger'] == winning_team else match['challenger']
+        winner_team = winning_team
+
+        # If the winning team was a challenger then rank changes need to occur
+        if winner_team == match['challenger']:
+            # Challenger wins - update ranks
+            losing_rank = self.teams[loser_team]['rank']
+
+            # Winner team takes the loser's rank on the ladder
+            self.teams[winner_team]['rank'] = losing_rank
+
+            # The loser team moves down on rank
+            self.teams[loser_team]['rank'] += 1
+
+            # Shift teams ranked below the losing team down by one
+            for team_name, team_data in self.teams.items():
+                if team_name != winner_team and team_name != loser_team and team_data['rank'] >= self.teams[loser_team]['rank']:
+                    team_data['rank'] += 1
+            
+            # Normalize ranks for safe measure
+            self.normalize_ranks()
+
+            # Send message confirmation about win and rank changes
+            await ctx.send(f"Team {winning_team} has won the match and taken the rank of Team {loser_team}! Team {loser_team} moves down one in the ranks... -This report was made by an Admin.")
+        
+        # If winning team is a challenged team
+        else:
+            # Challenger loses - no rank change occurs.
+            await ctx.send(f"Team {loser_team} has lost their match against Team {winning_team}... No rank changes occur. -This report was made by an Admin.")
+
+        # Update wins and losses for both teams
+        self.teams[winning_team]['wins'] += 1
+        self.teams[loser_team]['losses'] += 1
+
+        # Remove the match from matches.json, then save it and teams.json
+        del self.matches[match['challenger']]
+        self.save_teams()
+        self.save_matches()
+
+        # Post the newly updated standings
+        await self.post_standings(ctx)
+    
+    @commands.command()
+    async def post_challenges(self, ctx):
+        """
+        This method posts the current challenges
+        in the matches.json file.
+        """
+        # Check if matches.json has any data inside of it
+        if not self.matches:
+            await ctx.send("There are currently no active challenges on the board.")
+            return
+        
+        # Format the list of current challenges
+        challenge_list = []
+        for match_id, match_info in self.matches.items():
+            challenger = match_info['challenger']
+            challenged = match_info['challenged']
+            challenge_list.append(f"**Match ID**: {match_id}\n**Challenger**: {challenger}\n**Challenged**: {challenged}\n")
+        
+        # Join all challenges from challenge_list into a single string
+        challenges_text = "\n".join(challenge_list)
+
+        # Send the list of challenges
+        await ctx.send(f"**Current Challenges**:\n{challenges_text}")
+    
+    @commands.command()
+    async def post_standings(self, ctx):
+        """
+        Callable method by everyone to post the
+        standings in the channel this is called from
+        """
+
+        # Sort the teams by rank
+        sorted_teams = sorted(self.teams.items(), key=lambda x: (x[1]['rank'] is None, x[1]['rank']))
+
+        # Variable to hold data before we join it into a string
+        standings_list = []
+
+        # Iterate through every team in our sorted teams
+        for team in sorted_teams:
+            if team[1]['rank'] is not None:
+                
+                # Collect names of members on each team
+                member_names = []
+                for member_id in team[1]['members']:
+                    try:
+                        user = await self.bot.fetch_user(member_id)
+                        member_names.append(user.display_name)
+                    except discord.NotFound:
+                        member_names.append("Unknown User")
+                    except discord.HTTPException:
+                        member_names.append("Fetch Error")
+                
+                # Format the team information into something kind of pretty
+                standings_list.append(f"{team[1]['rank']}. {team[0]} ({' - '.join(member_names)}) - W: {team[1]['wins']} L: {team[1]['losses']}")
+        
+        # Join everything from standings_list into one string
+        standings = "\n".join(standings_list)
+
+        # Send standings to the channel where the command was called
+        await ctx.send(f"**Current Standings**:\n{standings}")
