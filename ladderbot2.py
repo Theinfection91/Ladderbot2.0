@@ -13,9 +13,7 @@ class Ladderbot(commands.Cog):
 
     This is a refactored class from all the functions
     that made up Ladderbot 1.x
-
     """
-
     def __init__(self, bot):
         self.bot = bot
 
@@ -46,7 +44,7 @@ class Ladderbot(commands.Cog):
     
     def load_teams(self):
         """
-        Method for loading data from teams.json
+        LOAD data from teams.json
         """
         if os.path.exists(self.TEAMS_FILE):
             with open(self.TEAMS_FILE, 'r') as f:
@@ -54,7 +52,7 @@ class Ladderbot(commands.Cog):
     
     def load_matches(self):
         """
-        Method for loading data from matches.json
+        LOAD data from matches.json
         """
         if os.path.exists(self.MATCHES_FILE):
             with open(self.MATCHES_FILE, 'r') as f:
@@ -62,7 +60,7 @@ class Ladderbot(commands.Cog):
     
     def load_state(self):
         """
-        Method for loading data from state.json
+        LOAD data from state.json
         """
         if os.path.exists(self.STATE_FILE):
             with open(self.STATE_FILE, 'r') as f:
@@ -73,21 +71,21 @@ class Ladderbot(commands.Cog):
 
     def save_teams(self):
         """
-        Method for saving data to teams.json
+        SAVE data to teams.json
         """
         with open(self.TEAMS_FILE, 'w') as f:
             json.dump(self.teams, f)
 
     def save_matches(self):
         """
-        Method for saving data to matches.json
+        SAVE data to matches.json
         """
         with open(self.MATCHES_FILE, 'w') as f:
             json.dump(self.matches, f)
 
     def save_state(self):
         """
-        Method to save data to state.json
+        SAVE to state.json
         """
         state = {
             'standings_channel_id': self.standings_channel_id,
@@ -190,3 +188,83 @@ class Ladderbot(commands.Cog):
         self.save_state()
         await ctx.send("The ladder has been started!")
     
+    @commands.command()
+    async def challenge(self, ctx, challenger_team, team_name):
+        """
+        Normal challenge command that EVERYONE can use
+
+        Takes the challenger team and the team they want
+        to challenge as the arguments. 
+
+        Only members of the challenging team can send
+        out challenges on their teams behalf.
+        """
+        # Checks if the ladder is running
+        if not self.ladder_running:
+            await ctx.send("The ladder has not been started yet.")
+            return
+        
+        # Ensure the challenger is part of the challenging team
+        if ctx.author.id not in self.teams[challenger_team]['members']:
+            await ctx.send("You are not part of the challenging team.")
+            return
+        
+        # Checks if both teams exist in teams.json
+        if challenger_team not in self.teams or team_name not in self.teams:
+            await ctx.send("One or both teams do not exist.")
+            return
+        
+        # Holds the rank of each team
+        challenger_rank = self.teams[challenger_team]['rank']
+        challenged_rank = self.teams[team_name]['rank']
+        
+        # Calculates to see if challenge is within the rank range of 2 above at most
+        if challenged_rank > challenger_rank or challenged_rank <= challenger_rank - 3:
+            await ctx.send(f"You can only challenge teams up to two ranks above your current rank.")
+            return
+        
+        # Check if either team is currently involved in another challenge, if so then cancel
+        for match in self.matches.values():
+            if (match['challenged'] == team_name or match['challenger'] == team_name or
+            match['challenged'] == challenger_team or match['challenger'] == challenger_team):
+                await ctx.send(f"One or both of these teams are currently involved in a match.")
+                return
+            
+        # If all checks are passed, create and add the new challenge to matches.json
+        match_id = f"{challenger_team}"
+        self.matches[match_id] = {
+            'challenger': challenger_team,
+            'challenged': team_name,
+            'status': 'pending'
+        }
+        self.save_matches()
+        await ctx.send(f"{challenger_team} has challenged {team_name}!")
+
+    @commands.command()
+    async def cancel_challenge(self, ctx, team_name):
+        """
+        A team that has sent out a challenge in mistake
+        can use this method to cancel it
+        """
+        # Check if given team name actually exists in teams.json
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+
+        # Check if the given team name has an active challenge sent out
+        match_id = next((key for key, value in self.matches.items() if value['challenger'] == team_name), None)
+
+        # If no sent challenge is found from team_name, stop method and print message
+        if not match_id:
+            await ctx.send(f"Team {team_name} does not have an active challenge.")
+            return
+        
+        # Ensure the author who called command is part of team that is trying to cancel the challenge
+        if ctx.author.id not in self.teams[team_name]['members']:
+            await ctx.send(f"You are not part of Team {team_name} and may not cancel their challenge!")
+            return
+        
+        # Cancel the challenge and print confirmation message
+        del self.matches[match_id]
+        self.save_matches()
+        await ctx.send(f"The challenge issued by {team_name} has been successfully canceled.")
