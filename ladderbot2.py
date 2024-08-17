@@ -8,7 +8,7 @@ import time
 class Ladderbot(commands.Cog):
     """
     --LADDERBOT 2.0--
-    Created by Ixnay
+    Created by Ixnay (Chase Carter)
     
 
     This is a refactored class from all the functions
@@ -113,6 +113,18 @@ class Ladderbot(commands.Cog):
                 if channel:
                     await self.update_standings_message(channel)
                     self.periodic_update_standings.start()
+
+    def normalize_ranks(self):
+        """
+        Helper method used to normalize ranks when
+        removing teams, setting ranks, etc.
+        """
+        sorted_teams = sorted(self.teams.items(), key=lambda x: x[1]['rank'])
+        new_rank = 1
+        for team_name, team_data in sorted_teams:
+            if team_data['rank'] is not None:
+                team_data['rank'] = new_rank
+                new_rank += 1
     
     @commands.command()
     async def register_team(self, ctx, team_name, *members: discord.Member):
@@ -144,3 +156,37 @@ class Ladderbot(commands.Cog):
         self.save_teams()
         member_names = [ctx.guild.get_member(member_id).display_name for member_id in team_members]
         await ctx.send(f"Team {team_name} has been registered with members {', '.join(member_names)}.")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def remove_team(self, ctx, team_name):
+        """
+        An Admin only method for removing a
+        specified team name
+        """
+        if team_name not in self.teams:
+            await ctx.send(f"Team {team_name} does not exist.")
+            return
+        
+        if team_name in self.teams:
+            del self.teams[team_name]
+            self.normalize_ranks()
+            self.save_teams()
+            await ctx.send(f"An Admin has removed Team {team_name} from the ladder.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def start_ladder(self, ctx):
+        """
+        Admin only method to start the ladder
+        """
+        if self.ladder_running:
+            await ctx.send("The ladder is already running.")
+            return
+        
+        self.ladder_running = True
+        self.normalize_ranks()
+        self.save_teams()
+        self.save_state()
+        await ctx.send("The ladder has been started!")
+    
