@@ -268,3 +268,46 @@ class Ladderbot(commands.Cog):
         del self.matches[match_id]
         self.save_matches()
         await ctx.send(f"The challenge issued by {team_name} has been successfully canceled.")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def admin_challenge(self, ctx, challenger_team, team_name):
+        """
+        Admin only method so that an admin can
+        manually set up challenges if need be.
+        """
+        # Checks if the ladder is running
+        if not self.ladder_running:
+            await ctx.send("The ladder has not been started yet.")
+            return
+        
+        # Checks if both teams exist in teams.json
+        if challenger_team not in self.teams or team_name not in self.teams:
+            await ctx.send("One or both teams do not exist.")
+            return
+        
+        # Holds the rank of each team
+        challenger_rank = self.teams[challenger_team]['rank']
+        challenged_rank = self.teams[team_name]['rank']
+        
+        # Calculates to see if challenge is within the rank range of 2 above at most
+        if challenged_rank > challenger_rank or challenged_rank <= challenger_rank - 3:
+            await ctx.send(f"Teams can only challenge other teams up to two ranks above their current rank.")
+            return
+        
+        # Check if either team is currently involved in another challenge, if so then cancel
+        for match in self.matches.values():
+            if (match['challenged'] == team_name or match['challenger'] == team_name or
+            match['challenged'] == challenger_team or match['challenger'] == challenger_team):
+                await ctx.send(f"One or both of these teams are currently involved in a match. Admin challenge canceled.")
+                return
+            
+        # If all checks are passed, create and add the new challenge to matches.json
+        match_id = f"{challenger_team}"
+        self.matches[match_id] = {
+            'challenger': challenger_team,
+            'challenged': team_name,
+            'status': 'pending'
+        }
+        self.save_matches()
+        await ctx.send(f"An Admin has manually created this challenge: {challenger_team} has challenged {team_name}!")
