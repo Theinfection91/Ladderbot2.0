@@ -655,3 +655,25 @@ class Ladderbot(commands.Cog):
         Admin only callable method for manually
         changing a team's rank to a specified integer
         """
+
+# Define bot prefix and intents
+intents = discord.Intents.default()
+intents.typing = False
+intents.presences = False
+intents.members = True  # Ensure the bot has the 'members' intent enabled
+intents.message_content = True
+
+# Initialize bot with command prefix and intents
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Add the LadderBot cog to the bot
+bot.add_cog(Ladderbot(bot))
+
+# Run the bot - Insert your Discord Bot Token in between the single quotes below
+bot.run('')
+
+"""
+This entire project can be found at:
+
+https://github.com/Theinfection91/Ladderbot2.0
+"""
