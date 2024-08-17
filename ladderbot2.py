@@ -502,7 +502,7 @@ class Ladderbot(commands.Cog):
     async def post_standings(self, ctx):
         """
         Callable method by everyone to post the
-        standings in the channel this is called from
+        standings in the channel this is called from.
         """
 
         # Sort the teams by rank
@@ -534,3 +534,124 @@ class Ladderbot(commands.Cog):
 
         # Send standings to the channel where the command was called
         await ctx.send(f"**Current Standings**:\n{standings}")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def set_standings_channel(self, ctx, channel: discord.TextChannel):
+        """
+        Admins will use this method to designate which
+        channel they want the dynamically changing
+        scoreboard to appear and update in.
+        """
+        # Grabs the given channel's integer ID to the bot and saves to state.json
+        self.standings_channel_id = channel.id
+        self.save_state()
+        await ctx.send(f"Standings will now be posted in {channel.mention}")
+
+        # Initialize or update the standings message in the new channel
+        await self.update_standings_message(channel)
+
+        # Stop the @tasks if it's already running to ensure clean channel setup
+        if self.periodic_update_standings.is_running():
+            self.periodic_update_standings.stop()
+        
+        self.periodic_update_standings.start()
+    
+    async def generate_standings(self):
+        """
+        Internal method used for the seperate
+        standings channel scoreboard.
+
+        Works just like post_standings, but adds
+        a time stamp and  returns everything back
+        into one long string.
+        """
+        # Sort the teams by rank
+        sorted_teams = sorted(self.teams.items(), key=lambda x: (x[1]['rank'] is None, x[1]['rank']))
+        
+        # Variable to hold data before we join it into a string
+        standings_list = []
+
+        # Iterate through every team in our sorted teams
+        for team in sorted_teams:
+            if team[1]['rank'] is not None:
+                
+                # Collect names of members on each team
+                member_names = []
+                for member_id in team[1]['members']:
+                    try:
+                        user = await self.bot.fetch_user(member_id)
+                        member_names.append(user.display_name)
+                    except discord.NotFound:
+                        member_names.append("Unknown User")
+                    except discord.HTTPException:
+                        member_names.append("Fetch Error")
+                
+                # Format the team information into something kind of pretty
+                standings_list.append(f"{team[1]['rank']}. {team[0]} ({' - '.join(member_names)}) - W: {team[1]['wins']} L: {team[1]['losses']}")
+        
+        # Create time stamp and format it to be readable
+        time_stamp = time.time()
+        readable_time_stamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time_stamp))
+
+        #Join the standings list into a string and append the timestamp
+        standings = "\n".join(standings_list)
+        standings += f"\n\nLast updated: {readable_time_stamp}"
+        return standings
+    
+    async def update_standings_message(self, channel):
+        """
+        Internal method used to edit the scoreboard
+        that appears in the designated standings channel.
+
+        If no message exists to edit, a new message is
+        created in the designated standings channel.
+        """
+        # Get the latest message from the channel's history
+        async for message in channel.history(limit=1): 
+            # Assign the latest message to standings_message
+            standings_message = message
+            break
+        else:
+            # If no messages are found, set to None
+            standings_message = None
+        
+        # Generate the standings text
+        standings_text = await self.generate_standings()
+
+        if standings_message:
+            # Update the existing message in the standings channel
+            await standings_message.edit(content=standings_text)
+        else:
+            # Send a new message if none exists in the standings channel
+            await channel.send(content=standings_text)
+    
+    async def initialize_standings_message(self, channel):
+        """
+        Assigns the return result of generate_standings()
+        to our self.standings_message that was made 
+        with our class constructor.
+        """
+        standings = await self.generate_standings()
+        self.standings_message = await channel.send(f"**Current Standings:**\n{standings}")
+        return self.standings_message
+    
+    @tasks.loop(seconds=15)
+    async def periodic_update_standings(self):
+        """
+        Internal task method that will update
+        the seperate scoreboard that appears in the
+        designated standings channel every 15 seconds.
+        """
+        if self.standings_channel_id:
+            channel = self.bot.get_channel(self.standings_channel_id)
+            if channel:
+                await self.update_standings_message(channel)
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def set_rank(self, ctx, team_name, rank: int):
+        """
+        Admin only callable method for manually
+        changing a team's rank to a specified integer
+        """
