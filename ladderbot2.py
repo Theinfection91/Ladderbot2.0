@@ -4,6 +4,15 @@ from discord.ext import commands, tasks
 import json
 import os
 import time
+import asyncio
+
+"""
+Delete 'from my_token import MY_DISCORD_TOKEN' when manually
+entering a full token string at the bottom of the code
+"""
+from my_token import MY_DISCORD_TOKEN
+"""
+"""
 
 class Ladderbot(commands.Cog):
     """
@@ -885,9 +894,9 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def main():
     await bot.add_cog(Ladderbot(bot))
     # Enter your Discord Bot Token between the single quotes below
-    await bot.start('')
+    await bot.start(MY_DISCORD_TOKEN)
 
-import asyncio
+
 asyncio.run(main())
 
 """
