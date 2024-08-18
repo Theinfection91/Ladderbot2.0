@@ -9,6 +9,9 @@ import asyncio
 """
 Delete 'from my_token import MY_DISCORD_TOKEN' when manually
 entering a full token string at the bottom of the code
+
+To use the my_token import correctly, please refer to the
+NOTE's at the bottom of the code in green comments
 """
 from my_token import MY_DISCORD_TOKEN
 """
@@ -507,6 +510,7 @@ class Ladderbot(commands.Cog):
         # Send the list of challenges
         await ctx.send(f"**Current Challenges**:\n{challenges_text}")
     
+    # TODO - Added to documentation but still need to add logic
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def set_challenges_channel(self, ctx, channel: discord.TextChannel):
@@ -514,6 +518,19 @@ class Ladderbot(commands.Cog):
         Admins will use this method to designate which
         channel they want the dynamically changing
         Challenges board to appear and update in.
+
+        You do not need to clear the channel before setting a new one
+        """
+    
+    # TODO - Added to documentation but still need to add logic
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def clear_challenges_channel(self, ctx):
+        """
+        This will clear the designated channel
+        that the challenges scoreboard was assigned to
+        and also stop the periodic update of the challenges
+        if it is currently running
 
         You do not need to clear the channel before setting a new one
         """
@@ -874,7 +891,7 @@ class Ladderbot(commands.Cog):
         """
         help_text = """
     **For more detailed information, refer to the bot's documentation.**
-    ** https://github.com/Theinfection91/LadderbotDoc/blob/main/Ladder%20Bot%20Documentation.md **
+    ** https://github.com/Theinfection91/Ladderbot2.0/blob/main/LadderbotDoc.md **
         """
 
         # Send the help text to the channel this method was called from
@@ -893,7 +910,19 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Define a main function to properly add cog to bot and start from tspecified token
 async def main():
     await bot.add_cog(Ladderbot(bot))
-    # Enter your Discord Bot Token between the single quotes below
+    
+    # NOTE: IF USING A MANUAL TOKEN, GO BACK TO TOP OF CODE AND DELETE THE 'from my_token import MY_DISCORD_TOKEN' LINE
+    # Remove the MY_DISCORD_TOKEN variable below and enter paste your Discord Bot Token in-between a pair of single quotes and save file
+        # Example: await bot.start('long_string_that_is_your_discord_token')
+    
+
+    # NOTE: ALTERNATIVELY, CREATE A FILE CALLED my_token.py IN SAME FOLDER AS ladderbot2.py
+    # INSIDE my_token.py YOU ONLY NEED ONE LINE OF CODE (DO NOT INCLUDE THE # BELOW) WHICH IS:
+    
+        # MY_DISCORD_TOKEN = 'long_string_that_is_your_discord_token'
+    
+    # BY DOING THIS METHOD, DO NOT DELETE THE 'from my_token import MY_DISCORD_TOKEN' AT TOP OF THIS CODE
+    
     await bot.start(MY_DISCORD_TOKEN)
 
 
