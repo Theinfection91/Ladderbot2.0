@@ -499,6 +499,17 @@ class Ladderbot(commands.Cog):
         await ctx.send(f"**Current Challenges**:\n{challenges_text}")
     
     @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def set_challenges_channel(self, ctx, channel: discord.TextChannel):
+        """
+        Admins will use this method to designate which
+        channel they want the dynamically changing
+        Challenges board to appear and update in.
+
+        You do not need to clear the channel before setting a new one
+        """
+    
+    @commands.command()
     async def post_standings(self, ctx):
         """
         Callable method by everyone to post the
@@ -542,6 +553,8 @@ class Ladderbot(commands.Cog):
         Admins will use this method to designate which
         channel they want the dynamically changing
         scoreboard to appear and update in.
+
+        You do not need to clear the channel before setting a new one
         """
         # Grabs the given channel's integer ID to the bot and saves to state.json
         self.standings_channel_id = channel.id
@@ -557,6 +570,28 @@ class Ladderbot(commands.Cog):
         
         self.periodic_update_standings.start()
     
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def clear_standings_channel(self, ctx):
+        """
+        This will clear the designated channel
+        that the standings scoreboard was assigned to
+        and also stop the periodic update of the standings
+        if it is currently running
+
+        You do not need to clear the channel before setting a new one
+        """
+        if self.standings_channel_id is not None:
+            if self.periodic_update_standings.is_running():
+                self.periodic_update_standings.stop()
+            self.standings_channel_id = None
+            self.save_state()
+            await ctx.send("The Standings channel ID has been cleared.")
+            return
+        else:
+            await ctx.send("Nothing is currently assigned as the Standings channel. Use !set_standings_channel #channel_name to assign one.")
+            return
+    
     async def generate_standings(self):
         """
         Internal method used for the seperate
@@ -565,6 +600,8 @@ class Ladderbot(commands.Cog):
         Works just like post_standings, but adds
         a time stamp and  returns everything back
         into one long string.
+
+        Is also used when ending the ladder
         """
         # Sort the teams by rank
         sorted_teams = sorted(self.teams.items(), key=lambda x: (x[1]['rank'] is None, x[1]['rank']))
