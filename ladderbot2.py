@@ -127,10 +127,15 @@ class Ladderbot(commands.Cog):
         if self.ladder_running:
             print("The ladder is currently running.")
             if self.standings_channel_id:
-                channel = self.bot.get_channel(self.standings_channel_id)
-                if channel:
-                    await self.update_standings_message(channel)
+                standings_channel = self.bot.get_channel(self.standings_channel_id)
+                if standings_channel:
+                    await self.update_standings_message(standings_channel)
                     self.periodic_update_standings.start()
+            if self.challenges_channel_id:
+                challenges_channel = self.bot.get_channel(self.challenges_channel_id)
+                if challenges_channel:
+                    await self.update_challenges_message(challenges_channel)
+                    self.periodic_update_challenges.start()
 
     def normalize_ranks(self):
         """
@@ -254,7 +259,7 @@ class Ladderbot(commands.Cog):
 
         # Print confirmation message with selected team name and designated members
         member_names = [ctx.guild.get_member(member_id).display_name for member_id in team_members]
-        await ctx.send(f"Team {team_name} has been registered with members {', '.join(member_names)}.")
+        await ctx.send(f"An Admin has registered Team {team_name} with members: {', '.join(member_names)}.")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -642,8 +647,22 @@ class Ladderbot(commands.Cog):
 
         You do not need to clear the channel before setting a new one
         """
-    
-    # TODO - Added to documentation but still need to add logic
+        # Takes the given channel's integer ID to the bot and saves state.json
+        self.challenges_channel_id = channel.id
+        self.save_state()
+        await ctx.send(f"The updating Challenges board is now set to: {channel.mention}")
+
+        # Initialize or update the challenges message in the given channel
+        await self.update_challenges_message(channel)
+
+        # Stop challenge @tasks if it's already running to ensure clean channel setup
+        if self.periodic_update_challenges.is_running():
+            self.periodic_update_challenges.stop()
+        
+        # Start challenges @tasks on specified channel
+        self.periodic_update_challenges.start()
+
+    # TODO: Still working on challenges channel logic overall
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def clear_challenges_channel(self, ctx):
@@ -655,7 +674,98 @@ class Ladderbot(commands.Cog):
 
         You do not need to clear the channel before setting a new one
         """
+        if self.challenges_channel_id is not None:
+            # If periodic challenges update is running, it is stopped
+            if self.periodic_update_challenges.is_running():
+                self.periodic_update_challenges.stop()
+            
+            # Set challenges channel ID to none, save state.json, and send confirmation message
+            self.challenges_channel_id = None
+            self.save_state()
+            await ctx.send("The Challenges channel ID has been cleared.")
+        else:
+            await ctx.send("Nothing is currently assigned as the Challenges channel. Use !set_challenges_channel #channel_name to assign one.")
+            return
     
+    async def generate_challenges(self):
+        """
+        Internal method used for the seperate
+        standings channel scoreboard.
+
+        Works just like post_challenges, but adds
+        a time stamp and returns everything back
+        into one long string.
+        """
+        # Format the list of current challenges
+        challenge_list = []
+        for match_id, match_info in self.matches.items():
+            challenger = match_info['challenger']
+            challenged = match_info['challenged']
+            challenge_list.append(f"**Match ID**: {match_id}\n**Challenger**: {challenger}\n**Challenged**: {challenged}\n")
+        
+        # Join all challenges from challenge_list into a single string
+        challenges_text = "\n".join(challenge_list)
+
+        # Create time stamp and format it to be readable
+        time_stamp = time.time()
+        readable_time_stamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time_stamp))
+
+        # Join the challenges text to one long string and then append the time stamp to the end
+        challenges = f"{challenges_text}\n\nLast updated: {readable_time_stamp}"
+        
+        # Return result to use as updating message in Challenges channel
+        return challenges
+    
+    async def update_challenges_message(self, channel):
+        """
+        Internal method used to find and edit the
+        dynamically changing message in the challenges.
+
+        If no message exists, a new message is 
+        created in the designated channel
+        """
+        # Get the latest message from the channel's history
+        async for message in channel.history(limit=1): 
+            # Assign the latest message to challenges_message
+            challenges_message = message
+            break
+        else:
+            # If no messages are found, set to None
+            challenges_message = None
+        
+        # Generate the challenges text
+        challenges_text = await self.generate_challenges()
+
+        # Check if a message is already present in the channel
+        if challenges_message:
+            # If message is present, edit and update the message with the new challenges report
+            await challenges_message.edit(content=challenges_text)
+        else:
+            # If no message is found in channel, send a new message with the new challenges report
+            await channel.send(content=challenges_text)
+
+    async def initialize_challenges_message(self, channel):
+        """
+        Assigns the return result of generate_challenges()
+        to our self.challenges_message that was made 
+        with our class constructor.
+        """
+        challenges = await self.generate_challenges()
+        self.challenges_message = await channel.send(f"**Current Challenges:**\n{challenges}")
+        return self.challenges_message
+    
+    @tasks.loop(seconds=15)
+    async def periodic_update_challenges(self):
+        """
+        Internal task method that will update
+        the seperate challenges board that appears in the
+        designated challenges channel every 15 seconds.
+        """
+        if self.challenges_channel_id:
+            channel = self.bot.get_channel(self.challenges_channel_id)
+            if channel:
+                await self.update_challenges_message(channel)
+
     @commands.command()
     async def post_standings(self, ctx):
         """
@@ -706,7 +816,7 @@ class Ladderbot(commands.Cog):
         # Grabs the given channel's integer ID to the bot and saves to state.json
         self.standings_channel_id = channel.id
         self.save_state()
-        await ctx.send(f"Standings will now be posted in {channel.mention}")
+        await ctx.send(f"The updating Standings board is now set to: {channel.mention}")
 
         # Initialize or update the standings message in the new channel
         await self.update_standings_message(channel)
@@ -715,6 +825,7 @@ class Ladderbot(commands.Cog):
         if self.periodic_update_standings.is_running():
             self.periodic_update_standings.stop()
         
+        # Start standings @tasks on specified channel
         self.periodic_update_standings.start()
     
     @commands.command()
@@ -729,8 +840,11 @@ class Ladderbot(commands.Cog):
         You do not need to clear the channel before setting a new one
         """
         if self.standings_channel_id is not None:
+            # If periodic standings updates are running, it is stopped
             if self.periodic_update_standings.is_running():
                 self.periodic_update_standings.stop()
+            
+            # Set standings channel ID to none, save state.json and send confirmation message
             self.standings_channel_id = None
             self.save_state()
             await ctx.send("The Standings channel ID has been cleared.")
@@ -781,6 +895,8 @@ class Ladderbot(commands.Cog):
         #Join the standings list into a string and append the timestamp
         standings = "\n".join(standings_list)
         standings += f"\n\nLast updated: {readable_time_stamp}"
+        
+        # Return result to use as updating message in Standings channel
         return standings
     
     async def update_standings_message(self, channel):
