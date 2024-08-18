@@ -207,6 +207,30 @@ class Ladderbot(commands.Cog):
         await self.post_standings(ctx)
         await ctx.send("The ladder has been started!")
     
+    async def send_challenge_notification(self, challenger_team, team_name):
+        """
+        This internal method will be used in the challenge and 
+        admin_challenge methods to send a message to the members
+        of a challenged team notifying them they have been challenged.
+
+        It uses the challenger_team parameter to hold the challenger team name
+        to send in the message, and uses team_name to find all members on that team
+        and then send them the message
+        """
+        if team_name in self.teams:
+            member_ids = self.teams[team_name]['members']
+            for member_id in member_ids:
+                # Fetch the member by their ID number
+                member = self.bot.get_user(member_id)
+                if member is not None:
+                    try:
+                        # If member is found, send message displaying who challenged them
+                        await member.send(f"Your team '{team_name}' has been challenged by Team '{challenger_team}'!")
+                    except discord.Forbidden:
+                        print(f"Could not send a message to {member} (ID: {member_id}).")
+                else:
+                    print(f"Member with ID {member_id} not found.")
+
     @commands.command()
     async def challenge(self, ctx, challenger_team, team_name):
         """
@@ -256,8 +280,15 @@ class Ladderbot(commands.Cog):
             'challenged': team_name,
             'status': 'pending'
         }
+        
+        # Save matches.json file
         self.save_matches()
+
+        # Prints a message to the channel the challenge was called from confirming the challenge
         await ctx.send(f"{challenger_team} has challenged {team_name}!")
+
+        # Sends a message to every member in the team that was challenged
+        await self.send_challenge_notification(challenger_team, team_name)
 
     @commands.command()
     async def cancel_challenge(self, ctx, team_name):
@@ -328,8 +359,15 @@ class Ladderbot(commands.Cog):
             'challenged': team_name,
             'status': 'pending'
         }
+        
+        # Save matches.json file
         self.save_matches()
+        
+        # Prints message from channel method was called from confirming challenge was made by an Admin
         await ctx.send(f"An Admin has manually created this challenge: {challenger_team} has challenged {team_name}!")
+
+        # Sends a message to every member in the team that was challenged
+        await self.send_challenge_notification(challenger_team, team_name)
     
     @commands.command()
     @commands.has_permissions(administrator=True)
