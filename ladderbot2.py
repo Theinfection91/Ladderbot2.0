@@ -144,6 +144,15 @@ class Ladderbot(commands.Cog):
                 team_data['rank'] = new_rank
                 new_rank += 1
     
+    def _is_member_already_registered(self, member_id: int) -> bool:
+        """
+        Checks if a player is already a member of any registered team.
+        """
+        for team in self.teams.values():
+            if member_id in team['members']:
+                return True
+        return False
+
     @commands.command()
     async def register_team(self, ctx, team_name, *members: discord.Member):
         """
@@ -163,6 +172,21 @@ class Ladderbot(commands.Cog):
         if len(members) != len(set(members)):
             await ctx.send("You are trying to register the same member twice. Please make sure each member is unique.")
             return
+        
+        # Include the author in the members list if no members are given.
+        if not members:
+            members = (ctx.author,)
+        
+        # Ensure that the author is in the list of members
+        if ctx.author not in members:
+            await ctx.send("Only an Admin can register someone else solely to a new team. You must at least include yourself like this: !register_team teamName @You @YourTeammate")
+            return
+
+        # Check if any member given is already registered on another team
+        for member in members:
+            if self._is_member_already_registered(member.id):
+                await ctx.send(f"{member.display_name} is already apart of another team.")
+                return
         
         # Grabs the ID of every member used as a parameter, if none given then the author is used instead
         team_members = [member.id for member in (members or [ctx.author])]
@@ -204,6 +228,12 @@ class Ladderbot(commands.Cog):
         if len(members) != len(set(members)):
             await ctx.send("You are trying to register the same member twice. Please make sure each member is unique.")
             return
+        
+        # Check if any member given is already registered on another team
+        for member in members:
+            if self._is_member_already_registered(member.id):
+                await ctx.send(f"{member.display_name} is already apart of another team.")
+                return
         
         # Grabs the ID of every member used as a parameter for this method and stores it
         team_members = [member.id for member in members]

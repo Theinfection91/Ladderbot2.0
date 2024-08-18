@@ -7,22 +7,22 @@ Ladder Bot is designed to manage a competitive ladder system for teams. It enabl
 
 ### Registering a Team
 - **Command:** `!register_team <team_name> <@member1> <@member2> ...`
-- **Description:** Registers a new team with the specified members. If no members are mentioned, the command creator will be added as the sole member.
+- **Description:** Registers a new team with the specified members. If no members are mentioned, the command creator will be added as the sole member. If any member given, even the author who calls the command, is already apart of another team then the command is canceled.
 - **Parameters:**
   - `<team_name>`: The name of the team to be registered.
   - `<@member1>, <@member2>, etc.`: Mentions of Discord users who are members of the team.
 - **Example:** `!register_team Alpha @User1 @User2`
-- **Response:** Confirms the registration and lists the team members.
+- **Response:** Confirms the registration and lists the team members. If a member is already on another team then the registration process is canceled.
 - **Permissions:** Any user can register a team.
   
 ### ADMIN - Registering a Team
 - **Command:** `!admin_register_team <team_name> <@member1> <@member2> ...`
-- **Description:** Registers a new team with the specified members. The members parameter here is NOT optional. At least one member must be passed to this function.
+- **Description:** Registers a new team with the specified members. The members parameter here is NOT optional. At least one member must be passed to this function. If given member is already a part of a team then the command is canceled.
 - **Parameters:**
   - `<team_name>`: The name of the team to be registered.
   - `<@member1>, <@member2>, etc.`: Mentions of Discord users who are members of the team.
 - **Example:** `!register_team Alpha @User1 @User2`
-- **Response:** Confirms the registration and lists the team members. If no members are given then a team is NOT registered and you must try again with at least one member.
+- **Response:** Confirms the registration and lists the team members. If no members are given then a team is NOT registered and you must try again with at least one member. If a member is already on another team then the registration process is canceled.
 - **Permissions:** Admin only.
 
 ### Removing a Team
