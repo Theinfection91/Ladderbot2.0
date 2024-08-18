@@ -840,11 +840,14 @@ intents.message_content = True
 # Initialize bot with command prefix and intents
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Add the LadderBot cog to the bot
-bot.add_cog(Ladderbot(bot))
+# Define a main function to properly add cog to bot and start from tspecified token
+async def main():
+    await bot.add_cog(Ladderbot(bot))
+    # Enter your Discord Bot Token between the single quotes below
+    await bot.start('')
 
-# Run the bot - Insert your Discord Bot Token in between the single quotes below
-bot.run('')
+import asyncio
+asyncio.run(main())
 
 """
 This entire project can be found at:
