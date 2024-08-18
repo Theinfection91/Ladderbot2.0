@@ -11,9 +11,11 @@ Delete 'from my_token import MY_DISCORD_TOKEN' when manually
 entering a full token string at the bottom of the code
 
 To use the my_token import correctly, please refer to the
-NOTE's at the bottom of the code in green comments
+NOTE's at the very bottom of the code in main() function
 """
+
 from my_token import MY_DISCORD_TOKEN
+
 """
 """
 
@@ -116,10 +118,10 @@ class Ladderbot(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """
-        A listener method used to keep track of
-        if the ladder is running and also the locations
-        of the seperate standings and
-        challenges channels.
+        Event listener that triggers when the bot is ready and logged in.
+        It checks if the ladder is running and if a standings channel is set.
+        If both conditions are true, it updates the standings message in 
+        the channel and starts a periodic update task.
         """
         print(f"Logged in as {self.bot.user}")
         if self.ladder_running:
@@ -152,11 +154,17 @@ class Ladderbot(commands.Cog):
         only the user who called on it as the sole
         person on the team.
         """
+        # Check if given team_name exists among teams
         if team_name in self.teams:
             await ctx.send(f"Team {team_name} already exists, please choose a different team name.")
             return
         
-        # Grabs the ID of every member used as a parameter for this method and stores it
+        # Check for duplicate members
+        if len(members) != len(set(members)):
+            await ctx.send("You are trying to register the same member twice. Please make sure each member is unique.")
+            return
+        
+        # Grabs the ID of every member used as a parameter, if none given then the author is used instead
         team_members = [member.id for member in (members or [ctx.author])]
 
         # Each newly created team will start in the last most place in standings
@@ -169,7 +177,52 @@ class Ladderbot(commands.Cog):
             'losses': 0
         }
 
+        # Save the teams.json file
         self.save_teams()
+
+        # Print confirmation message with selected team name and designated members
+        member_names = [ctx.guild.get_member(member_id).display_name for member_id in team_members]
+        await ctx.send(f"Team {team_name} has been registered with members: {', '.join(member_names)}.")
+    
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def admin_register_team(self, ctx, team_name, *members: discord.Member):
+        """
+        Admin method of creating new teams with specified members.
+        """
+        # Check if given team_name exists among teams
+        if team_name in self.teams:
+            await ctx.send(f"Team {team_name} already exists, please choose a different team name.")
+            return
+        
+        # Check if at least one member is passed
+        if not members:
+            await ctx.send("You must specify at least one member to create a team. Try again using !admin_register_team teamName @member_name")
+            return
+        
+        # Check for duplicate members
+        if len(members) != len(set(members)):
+            await ctx.send("You are trying to register the same member twice. Please make sure each member is unique.")
+            return
+        
+        # Grabs the ID of every member used as a parameter for this method and stores it
+        team_members = [member.id for member in members]
+
+        # Each newly created team will start in the last most place in standings
+        add_team_rank = len(self.teams) + 1
+
+        # Structure the dictionary that will hold team data
+        self.teams[team_name] = {
+            'members': team_members,
+            'rank': add_team_rank,
+            'wins': 0,
+            'losses': 0
+        }
+
+        # Save the teams.json file
+        self.save_teams()
+
+        # Print confirmation message with selected team name and designated members
         member_names = [ctx.guild.get_member(member_id).display_name for member_id in team_members]
         await ctx.send(f"Team {team_name} has been registered with members {', '.join(member_names)}.")
 
@@ -945,21 +998,28 @@ intents.message_content = True
 # Initialize bot with command prefix and intents
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Define a main function to properly add cog to bot and start from tspecified token
+# Define a main function to properly add cog to bot and start from specified token
 async def main():
     await bot.add_cog(Ladderbot(bot))
     
-    # NOTE: IF USING A MANUAL TOKEN, GO BACK TO TOP OF CODE AND DELETE THE 'from my_token import MY_DISCORD_TOKEN' LINE
-    # Remove the MY_DISCORD_TOKEN variable below and enter paste your Discord Bot Token in-between a pair of single quotes and save file
-        # Example: await bot.start('long_string_that_is_your_discord_token')
+    """
+    NOTE: IF USING A MANUAL TOKEN, GO BACK TO TOP OF CODE AND DELETE THE 'from my_token import MY_DISCORD_TOKEN' LINE
+    Remove the MY_DISCORD_TOKEN variable below and enter paste your Discord Bot Token in-between a pair of single quotes and save file
+        
+        Example: await bot.start('long_string_that_is_your_discord_token')
+        
+    """
     
 
-    # NOTE: ALTERNATIVELY, CREATE A FILE CALLED my_token.py IN SAME FOLDER AS ladderbot2.py
-    # INSIDE my_token.py YOU ONLY NEED ONE LINE OF CODE (DO NOT INCLUDE THE # BELOW) WHICH IS:
+    """
+    NOTE: ALTERNATIVELY, CREATE A FILE CALLED my_token.py IN SAME FOLDER AS ladderbot2.py
+    INSIDE my_token.py YOU ONLY NEED ONE LINE OF CODE WHICH IS:
     
-        # MY_DISCORD_TOKEN = 'long_string_that_is_your_discord_token'
+        MY_DISCORD_TOKEN = 'long_string_that_is_your_discord_token'
     
-    # BY DOING THIS METHOD, DO NOT DELETE THE 'from my_token import MY_DISCORD_TOKEN' AT TOP OF THIS CODE
+    BY DOING THIS METHOD, DO NOT DELETE THE 'from my_token import MY_DISCORD_TOKEN' AT TOP OF THIS CODE
+    
+    """
     
     await bot.start(MY_DISCORD_TOKEN)
 

@@ -14,6 +14,16 @@ Ladder Bot is designed to manage a competitive ladder system for teams. It enabl
 - **Example:** `!register_team Alpha @User1 @User2`
 - **Response:** Confirms the registration and lists the team members.
 - **Permissions:** Any user can register a team.
+  
+### ADMIN - Registering a Team
+- **Command:** `!admin_register_team <team_name> <@member1> <@member2> ...`
+- **Description:** Registers a new team with the specified members. The members parameter here is NOT optional. At least one member must be passed to this function.
+- **Parameters:**
+  - `<team_name>`: The name of the team to be registered.
+  - `<@member1>, <@member2>, etc.`: Mentions of Discord users who are members of the team.
+- **Example:** `!register_team Alpha @User1 @User2`
+- **Response:** Confirms the registration and lists the team members. If no members are given then a team is NOT registered and you must try again with at least one member.
+- **Permissions:** Admin only.
 
 ### Removing a Team
 - **Command:** `!remove_team <team_name>`
@@ -68,7 +78,7 @@ Ladder Bot is designed to manage a competitive ladder system for teams. It enabl
   - `<team_name>`: The name of the team that sent out the challenge.
 - **Example:** `!admin_cancel_challenge Echo`
 - **Response:** Confirms the challenge was canceled by an Admin.
-- **Permissions:** Admins only.
+- **Permissions:** Admin only.
 
 ### Post Challenges
 - **Command:** `!post_challenges`
