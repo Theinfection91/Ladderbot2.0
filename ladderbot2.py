@@ -365,8 +365,8 @@ class Ladderbot(commands.Cog):
             await ctx.send(f"There is no match involving {winning_team}.")
             return
 
-        # Ensure the author is part of either the winning or losing team
-        if ctx.author.id not in self.teams[match['challenger']['members']] and ctx.author.id not in self.teams[match['challenged']['memers']]:
+        # Ensure the author is part of the match
+        if ctx.author.id not in self.teams[match['challenger']]['members'] and ctx.author.id not in self.teams[match['challenged']]['members']:
             await ctx.send("You are not part of this match.")
             return
         
@@ -711,6 +711,7 @@ class Ladderbot(commands.Cog):
             return
         
         self.teams[team_name]['wins'] += 1
+        self.save_teams()
         await ctx.send(f"Team {team_name} has had a win given to them by an Admin. They now have {self.teams[team_name]['wins']} wins.")
     
     @commands.command()
@@ -730,6 +731,7 @@ class Ladderbot(commands.Cog):
         
         if self.teams[team_name]['wins'] >= 1:
             self.teams[team_name]['wins'] -= 1
+            self.save_teams()
             await ctx.send(f"Team {team_name} has had a win taken away by an Admin. They now have {self.teams[team_name]['wins']} wins.")
     
     @commands.command()
@@ -744,6 +746,7 @@ class Ladderbot(commands.Cog):
             return
         
         self.teams[team_name]['losses'] += 1
+        self.save_teams()
         await ctx.send(f"Team {team_name} has had a loss given to them by an Admin. They now have {self.teams[team_name]['losses']} losses.")
     
     @commands.command()
@@ -763,6 +766,7 @@ class Ladderbot(commands.Cog):
         
         if self.teams[team_name]['losses'] >= 1:
             self.teams[team_name]['losses'] -= 1
+            self.save_teams()
             await ctx.send(f"Team {team_name} has had a loss taken away by an Admin. They now have {self.teams[team_name]['losses']} losses.")
     
     @commands.command()
@@ -780,7 +784,7 @@ class Ladderbot(commands.Cog):
         sorted_teams = sorted(self.teams.items(), key=lambda x: (x[1]['rank'] is None, x[1]['rank']))
 
         # Generate standings
-        standings = self.generate_standings()
+        standings = await self.generate_standings()
 
         if standings:
             # Create holders for 1st, 2nd, and 3rd place
