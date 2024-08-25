@@ -3,7 +3,7 @@
 
 # Discord Ladderbot
 
-A Discord bot designed to manage and facilitate challenges between teams in a ladder-style competition. Teams can challenge others, track their rankings, and receive notifications when they are challenged.
+The predecessor to **Ladderbot3.0**, Ladderbot2.0 is a Discord bot designed to manage and facilitate challenges between teams in a ladder-style competition. Teams can challenge others, track their rankings, and receive notifications when they are challenged.
 
 ## Features
 
